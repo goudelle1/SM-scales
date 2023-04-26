@@ -21,9 +21,17 @@ df <- data_og[,!names(data_og) %in% c("minwaittime", "delay")]
 df <- filter(df, sensitivity %in% c(1, 4, 7))
 #Remove data from irrelevant sections
 df <- filter(df, is_relevant_section == "True")
-#Missingvalues in relevant columns!!! -TO DO!!!-
 
-## Add number of TOO_FEW and TOO_MANY ====
+#Missing values in relevant columns!!! 
+# Count the number of NA values in each column
+na_count <- colSums(is.na(df))
+# Print the results
+print(na_count)
+#->6310 missing item_weight and locationid
+# Remove rows with missing values in ITEM_WEIGHT
+df <- df %>% filter(!is.na(ITEM_WEIGHT))
+
+## Add number of TOO_FEW  ====
 
 #TOO_FEW_per_week: absolute number of TOO_FEW per section and per week
 df <- df %>%
@@ -32,12 +40,16 @@ df <- df %>%
   mutate(TOO_FEW_per_week = sum(weightclassification == 'TOO_FEW'))
 sum(is.na(df$TOO_FEW_per_week))
 
-#Fraction_TOO_MANY: fraction of TOO_MANY / Automatic per section 
-# -DOES NOT WORK YET-
+## fraction of TOO_MANY / Automatic per section ====
 df <- df %>%
   group_by(section_id) %>%
-  mutate(Fraction_TOO_MANY = sum(weightclassification == 'TOO_MANY' & initiatortype == 'Automatic') / sum(initiatortype == 'Automatic'))
-sum(is.na(df$Fraction_TOO_MANY)) # all the data...
+  mutate(Fraction_TOO_MANY = sum(weightclassification == 'TOO_MANY') / sum(initiatortype == 'AUTOMATIC'))
+sum(is.na(df$Fraction_TOO_MANY)) # 7485
+
+# Calculate Fraction_TOO_MANY by section using aggregate
+result <- aggregate(Fraction_TOO_MANY ~ section_id, data = df, FUN = mean, na.rm = TRUE)
+# Print the resulting table
+print(result)
 
 
 # Exploratory Data Analysis ====
