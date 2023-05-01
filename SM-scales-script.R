@@ -23,24 +23,40 @@ data_og <- measurements %>%
   left_join(scale_preprocessing, by = "deviceid")
 
 ## Reduce dataset ====
-#Remove unused columns
-df <- data_og[,!names(data_og) %in% c("minwaittime", "delay")]
-#Filter data for sensitivity 1,4 and 7 -TO BE JUSTIFIED-
-df <- filter(df, sensitivity %in% c(1, 4, 7))
-#Remove data from irrelevant sections
-df <- filter(df, is_relevant_section == "True")
 
-#Missing values in relevant columns!!! 
-# Count the number of NA values in each column
+# Remove unused columns
+df <- data_og[,!names(data_og) %in% c("minwaittime", "delay")]
+
+# Filter data for sensitivity 1,4 and 7 -TO BE JUSTIFIED-
+df <- filter(df, sensitivity %in% c(1, 4, 7))
+
+# Missing values in relevant columns!!! 
+## Count the number of NA values in each column
 na_count <- colSums(is.na(df))
 # Print the results
 print(na_count)
 #->6310 missing item_weight and locationid
-# Remove rows with missing values in ITEM_WEIGHT
+## Remove rows with missing values in ITEM_WEIGHT
 df <- df %>% filter(!is.na(ITEM_WEIGHT))
+
+# Remove data from irrelevant sections
+df <- filter(df, is_relevant_section == "True")
+
+# Keep only the data from sections lasting at least 7 days
+## Find the start and end time of each section
+df <- df %>%
+  group_by(section_id) %>%
+  mutate(start_time = min(weighttime), end_time = max(weighttime)) 
+## Add the span of each section:
+df <- df %>%
+  mutate(span = as.numeric(difftime(end_time, start_time, units = "days")))
+## Remove observations from sections lasting less than 7 days
+df <- df %>% filter(span >= 7)
+
 
 ## Add number of TOO_FEW  ====
 #TOO_FEW_per_week: absolute number of TOO_FEW per section and per week
+# THIS IS WRONG, THE CALCULATION OF THE WEEK IS NOT CORRECT
 df <- df %>%
   mutate(week = week(weighttime)) %>%
   group_by(week, section_id) %>%
@@ -76,8 +92,7 @@ ggplot(df, aes(x = sensitivity)) +
   geom_histogram(stat = "count") +
   xlab("Sensitivity") +
   ylab("Number of Observations") +
-  scale_x_continuous(breaks = c(1, 4, 7)) #+
-#scale_y_continuous(breaks = seq(0, max(..count..), by = 1), labels = function(x) as.integer(x))
+  scale_x_continuous(breaks = c(1, 4, 7)) 
 
 
 ## TOO_FEW_per_week ====
@@ -120,8 +135,7 @@ ggplot(sections_fract_TOO_MANY, aes(x=Fraction_TOO_MANY)) +
 
 
 #-DOES NOT WORK YET-
-#reproduce graphe of a scale as they gave us? Histogram of different weight bins,
-#different sensitivity, to see how many values of each we have
+#reproduce graphe of a scale as they gave us? (was the wish of the D-one guy...)
 
 
 
