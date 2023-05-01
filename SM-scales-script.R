@@ -1,6 +1,14 @@
 # Libraries
 library(tidyverse)
 library(lubridate)
+library(ggthemes)
+
+# set the plots theme
+theme_set(theme_bw())
+
+# to not see scientific notations in plots
+options(scipen = 999)
+
 
 # Data loading and preprocessing ====
 
@@ -32,7 +40,6 @@ print(na_count)
 df <- df %>% filter(!is.na(ITEM_WEIGHT))
 
 ## Add number of TOO_FEW  ====
-
 #TOO_FEW_per_week: absolute number of TOO_FEW per section and per week
 df <- df %>%
   mutate(week = week(weighttime)) %>%
@@ -44,26 +51,43 @@ sum(is.na(df$TOO_FEW_per_week))
 df <- df %>%
   group_by(section_id) %>%
   mutate(Fraction_TOO_MANY = sum(weightclassification == 'TOO_MANY') / sum(initiatortype == 'AUTOMATIC'))
-sum(is.na(df$Fraction_TOO_MANY)) # 7485
-
-# Calculate Fraction_TOO_MANY by section using aggregate
-result <- aggregate(Fraction_TOO_MANY ~ section_id, data = df, FUN = mean, na.rm = TRUE)
-# Print the resulting table
-print(result)
-
+sum(is.na(df$Fraction_TOO_MANY)) # 7485: no weightclassification == TOO_MANY and/or initiatortype == 'AUTOMATIC'
+# Prepare a table with the different section_id and their respective fraction of TOO_MANY/AUTOMATIC
+# create table with unique section_id values
+unique_sections <- distinct(df, section_id)
+# join unique_sections with df to get Fraction_TOO_MANY values for each section_id
+sections_fract_TOO_MANY <- left_join(unique_sections, df %>% 
+                            group_by(section_id) %>% 
+                            summarise(Fraction_TOO_MANY = sum(weightclassification == 'TOO_MANY') / sum(initiatortype == 'AUTOMATIC')), 
+                          by = 'section_id') %>% 
+  mutate(Fraction_TOO_MANY = ifelse(is.na(Fraction_TOO_MANY), 0, Fraction_TOO_MANY)) # replace NAs by 0
 
 # Exploratory Data Analysis ====
 
+## Histogram weight_bins ====
+ggplot(df, aes(x = factor(weight_bin,
+                          levels = c("0 - 803", "803 - 1877", "1877 - 3859", "3859 - 6673", "6673 - 100000")))) +
+  geom_histogram(stat = "count") +
+  xlab("Weight Bins") +
+  ylab("Number of Observations")
 
-## TOO_FEW_per_week -DOES NOT WORK YET-
+## Histogram sensitivity ====
+ggplot(df, aes(x = sensitivity)) +
+  geom_histogram(stat = "count") +
+  xlab("Sensitivity") +
+  ylab("Number of Observations") +
+  scale_x_continuous(breaks = c(1, 4, 7)) #+
+#scale_y_continuous(breaks = seq(0, max(..count..), by = 1), labels = function(x) as.integer(x))
 
+
+## TOO_FEW_per_week ====
 too_few_target = 2
 
 #Count the total number of sections
 total_sections <- df %>%
   distinct(section_id) %>%
   nrow()
-#Count the total number of sections with 'TOO_FEW_per_week' greater than too_few_target
+# Count the total number of sections with 'TOO_FEW_per_week' greater than too_few_target
 sections_with_few <- df %>%
   filter(TOO_FEW_per_week > too_few_target) %>%
   distinct(section_id) %>%
@@ -71,14 +95,46 @@ sections_with_few <- df %>%
 # Print the results
 cat("Total number of sections: ", total_sections, "\n")
 cat("Total number of sections with TOO_FEW_per_week > 2: ", sections_with_few, "\n")
+# Plot number of sections and TOO_FEW_per_week:
+# Create a dataframe with section IDs and their corresponding number of 'TOO_FEW' measurements per week
+too_few_counts <- df %>%
+  group_by(section_id) %>%
+  summarise(too_few_count = sum(TOO_FEW_per_week))
+# Create the histogram plot
+ggplot(too_few_counts, aes(x = too_few_count)) +
+  geom_histogram(binwidth = 30) +
+  geom_vline(xintercept = too_few_target, color = "red") +
+  ggtitle("Section Counts by 'TOO_FEW' Measurements per Week") +
+  xlab("Number of 'TOO_FEW' Measurements per week") +
+  ylab("Number of Sections") 
+
+## Fraction TOO_MANY ====
+frac_TOO_MANY_target <- 0.5 
+
+ggplot(sections_fract_TOO_MANY, aes(x=Fraction_TOO_MANY)) +
+  geom_histogram(binwidth=0.05) +
+  geom_vline(xintercept = frac_TOO_MANY_target, color = "red") +
+  ggtitle("Distribution of Fraction_TOO_MANY") +
+  xlab("Fraction_TOO_MANY") +
+  ylab("Number of sections")
 
 
+#-DOES NOT WORK YET-
+#reproduce graphe of a scale as they gave us? Histogram of different weight bins,
+#different sensitivity, to see how many values of each we have
 
-#reproduce graphe of a scale as they gave us? Histogram of different weight bins, different sensitivity
+
 
 # Analysis of the effect of weight ====
 
-## Select the observartions relevant for weight analysis
-df_weight <- filter(df, relevant_for_weight_analyis == "True")
+## Scale types ====
+
+
+# Model the influence of SCALE_NAME on TOO_FEW_per_week and Fraction_TOO_MANY for the different values of sensitivity
+
+
+
+## Select the observations relevant for weight analysis
+df_weight <- filter(df, relevant_for_weight_analysis == "True")
 
 
